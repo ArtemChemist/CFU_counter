@@ -37,7 +37,7 @@ def define_circular_ROI(image):
     Y = H/2
     X = W/2
 
-    radius= 0.34*W
+    radius= 0.4*W
     
     return Y,X,radius
 
@@ -50,53 +50,22 @@ for file in file_names:
     #Read the image images
     img = cv2.imread(folder_path+'/'+file)
 
-    #Conver to grayscale
-    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    #Filter out dust and pepper
-    img_blur = cv2.medianBlur(img_gray,17)
-
     #Define the center and the radius of the ROI
-    X_cent, Y_cent, Rad = define_circular_ROI(img_blur)
+    X_cent, Y_cent, Rad = define_circular_ROI(img)
 
     #Set everything outside of the ROI to 0
-    H,W = img_blur.shape[:2]
+    H,W = img.shape[:2]
     mask = create_circular_mask(H, W, (X_cent, Y_cent), Rad)
-    img_blur[~mask] = 0
+    img[~mask] = 0
+    #img[img<60] = 0
+    #img = cv2.GaussianBlur(img, (7,7),2)
 
-    #Set everything below T1 to 0
-    img_blur[img_blur<T1] = 0
+    gray= cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    #Set everything at or above T2 to 0
-    img_blur[img_blur>=T2] = 255
-
-    #Do the hysteresis threshold
-    for i in range(1,H-1):
-        for k in range(1,W-1):
-            neigbours = np.array([
-                         img_blur[i-1,k-1], 
-                         img_blur[i,k-1],
-                         img_blur[i-1,k],
-                         img_blur[i+1,k+1],
-                         img_blur[i+1,k],
-                         img_blur[i,k+1],
-                         img_blur[i-1,k+1],
-                         img_blur[i+1,k-1]])
-            #If no neigbour pixel is positive, set this to negative
-            if (img_blur[i,k]<T2 and neigbours.max() <T2):
-                img_blur[i,k] = 0
-            
-            #If there is a positive neigbour, set this to positive
-            elif (img_blur[i,k]>T1 and neigbours.max() >=T2):
-                img_blur[i,k] = 255
-
-    #Use img_blur as a mask to highlight colonies on teh original image
-    img[img_blur>0] = [0,255,0]
-
-    '''            
-    #Apply dynamic thresholding
-    niBlack = cv2.ximgproc.niBlackThreshold(img_blur, 255, cv2.THRESH_BINARY, 101,0.7,cv2.ximgproc.BINARIZATION_NIBLACK)
-    '''
+    sift = cv2.SIFT_create()
+    kp = sift.detect(gray,None)
+    kp_filtered = [point for point in kp if point.size<50]
+    img=cv2.drawKeypoints(gray, kp_filtered, np.array([]), (0,255,0), cv2.DrawMatchesFlags_DRAW_RICH_KEYPOINTS)
 
     #Write the final image
     cv2.imwrite(processed_path+'/'+file, img)
