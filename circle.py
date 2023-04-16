@@ -83,7 +83,7 @@ def Find_All_Circles(params, input_img):
     else:
         return [], img_gr
 
-def Find_Best_Circle(circles, image, start: int, end: int, step:int):
+def Find_Best_Center(circles, image, start: int, end: int, step:int):
     '''
     Find the circle that had the sharpest change brightness as we move away from its center
     '''
@@ -104,7 +104,8 @@ def Find_Best_Circle(circles, image, start: int, end: int, step:int):
     for i, circle in enumerate(circles):
         #Calculate how intensity changes (i.e. derivative) as the radius increases.       
         Deriv_f_R = Deriv(img_gr,  (circle[0], circle[1]), Start_rad, End_rad, Deriv_Step)
-
+        # Do median filtration
+        Deriv_f_R  = signal.medfilt(Deriv_f_R , 3)
         #Find what was the sharpest change for this circle, 
         MaxDeriv = np.max(Deriv_f_R)
         circle[4] =  int(MaxDeriv * 1000) # we strore it in int array
@@ -132,7 +133,7 @@ def Find_Best_Circle(circles, image, start: int, end: int, step:int):
     #print(Fine_Deriv)
 
     # Start forming the list we will return: add center coordinate
-    return_value = [BestCircle[0], BestCircle[1]]
+    return_value = [BestCircle[0], BestCircle[1], BestCircle[5]]
 
     # Go through the deriv until it crosses the pre-defined trhreshold
     # Add Start_rad pixels from the center, we only started there, not at 0
@@ -142,10 +143,34 @@ def Find_Best_Circle(circles, image, start: int, end: int, step:int):
             Deriv_crossed = True
         if Deriv_crossed:
             best_rad = Start_rad+i*FineStep
-            print(f"Crossed at {best_rad }")
-            return_value.append(best_rad )
+            print(f"First iter rad {best_rad }")
+            return_value[2] = best_rad
             break
     return [return_value]
+
+def Find_Best_Radius(center, image, start: int, end: int, step:int, thresh):
+    '''
+    Find the circle that had the sharpest change brightness as we move away from its center
+    '''
+    #Take blue channel, threshold the hell out of it, to leave only LED
+    img_gr = cv2.adaptiveThreshold(image[:,:,0],255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,81,15)
+    img_gr = cv2.bitwise_not(img_gr)
+    # kernel = np.ones((2, 2), np.uint8)
+    # img_gr = cv2.erode(img_gr , kernel, iterations = 3)
+
+    Int_arr = [Intensity(img_gr, center, rad, step) for rad in range (start, end, step)]
+    Int_arr = signal.medfilt(Int_arr, 3)
+    Int_arr  = np.round(Int_arr , 3)
+    # print(Int_arr )
+
+    # Go through the deriv until it crosses the pre-defined trhreshold
+    # Add Start_rad pixels from the center, we only started there, not at 0
+    for i in range(len(Int_arr )-1, 0, -1):
+        if Int_arr [i] < thresh:
+            best_rad = start+(i+1)*step
+            print(f"Second iter rad {best_rad }")
+            return( best_rad )
+    return end
 
 def Find_Optimum_Circles(params_Hough, img, min_num, max_num):
     """

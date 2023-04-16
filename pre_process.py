@@ -7,7 +7,7 @@ from os.path import isfile, join
 #from skimage.filters import threshold_sauvola
 import time
 from aux import Circular_mask, ScaleImage, DrawCircles, EnhanceContrast
-from circle import Find_Best_Circle, Find_Optimum_Circles
+from circle import Find_Best_Center, Find_Optimum_Circles, Find_Best_Radius
 
 
 
@@ -32,7 +32,7 @@ def main():
             #Hough Transform parameters
             accum_res  = 3 # image resolution/accum resolution, 4 means accum is 1/4th of image
             min_between = 4 #Min dist between circles. 
-            minRadius = 600 #Min radius of a circle. 
+            minRadius = 610 #Min radius of a circle. 
             maxRadius= 740 #The bigest circle expected
             Canny_thr = 1100 #anything above that is an edge automatically in Canny, the lower threshold is half of that.
             Accum_thr = 1100 #accumulator threshold for the circle centers at the detection stage
@@ -44,14 +44,14 @@ def main():
             #If there are any circles, filter them by centricity and dI/dR
             if len(Circles)>0:
                 # In the list of centers, find the center of the true ROI
-                # Check along the radius, from start to end, steping every step pixels
+                # For that: Check along the radius, from start to end, steping every step pixels
                 # These are different form similar numbers in Hough params
                 # Becasue Hough needs to be stable, but this procidure needs to be precise
-                BestCirc = Find_Best_Circle(circles = Circles,
-                                             image= img_scaled,
-                                              start= 200,
-                                              end = 720,
-                                              step = 10)
+                BestCirc = Find_Best_Center(circles = Circles,
+                                                image= img_scaled,
+                                                start= 480,
+                                                end = 720,
+                                                step = 10)
 
                 # Draw the best circel on the image
                 # img_scaled= DrawCircles(BestCirc, img_scaled)
@@ -63,15 +63,45 @@ def main():
                     r = BestCirc[0][2]  # Radius
 
                     # Apply circluar mask around best circle, set everything outside to 0
-
-                    hole = Circular_mask(img_scaled.shape[0], img_scaled.shape[1], center = (x,y), radius = r)
+                    h = img_scaled.shape[0]
+                    w = img_scaled.shape[1]
+                    hole = Circular_mask(h, w, center = (x,y), radius = r)
                     img_scaled[~hole] = 0
+                    top_edge = max(y-r, 0)
+                    bottom_edge = min(y+r, h)
+                    left_edge = max(x-r,0)
+                    right_edge = min(x+r,w)
                     #Cut out the region of interest around this circle
-                    ROI_image = img_scaled[y-r:y+r, x-r:x+r, :]
+                    First_Iter = img_scaled[top_edge:bottom_edge, left_edge:right_edge, :]
+                    # Stardardize all images to the same size
+                    # That makes next step more stable
+                    First_Iter = ScaleImage(First_Iter, width = 1024)
 
                     # Enhance contrast
-                    contrast_enh = EnhanceContrast(ROI_image, -20, 45) 
+                    First_Iter = EnhanceContrast(First_Iter, -20, 45) 
 
+                    # Second iteration - now go by intensity, not derivative
+                    # Also, go from outside in
+                    h2 = First_Iter.shape[0]
+                    w2 = First_Iter.shape[1]
+                    y2 = First_Iter.shape[0]//2
+                    x2 = First_Iter.shape[1]//2
+                    fine_step = 10
+                    end =  x2
+
+                    r2 = Find_Best_Radius(center = (x2,y2), 
+                                            image = First_Iter,
+                                            start= end-10*fine_step, end = end, step = fine_step,
+                                            thresh= 0.025)
+
+                    new_hole = Circular_mask(h2, w2, center = (x2,y2), radius = r2)
+                    First_Iter[~new_hole] = 0
+                    top_edge = max(y2-r2, 0)
+                    bottom_edge = min(y2+r2, h2)
+                    left_edge = max(x2-r2,0)
+                    right_edge = min(x2+r2,w2)
+                    ROI_image = First_Iter[top_edge:bottom_edge, left_edge:right_edge, :]
+                    
                     """
                     #Threshold the edges to remove residual LED glare
                     th = cv2.adaptiveThreshold(contrast_enh[:,:,0],255,cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY,41,22)
@@ -86,7 +116,7 @@ def main():
                     # Write final file to disk
                     # Scale the new image to 1024 pixels
                     # We do not need more than 512 for NN anyway
-                    final = ScaleImage(contrast_enh, width = 1024)
+                    final = ScaleImage(ROI_image, width = 1024)
                     if os.path.exists(new_name):
                         os.remove(new_name)
                     cv2.imwrite(new_name , final)
