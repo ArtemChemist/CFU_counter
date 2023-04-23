@@ -43,7 +43,7 @@ def Deriv(image= np.array, center = (int, int),  min_radius = int, max_radius = 
         # Calculate histogram of the masked image
         # Note, cv2 does that much faster then straight numpy.
         # This appears to be the speed limiting step
-        hist = cv2.calcHist([image], [0], my_mask, [128], [0,256])
+        hist = cv2.calcHist([image], [0], my_mask, [4], [0,256])
         bright_arr.append((hist[-1]/sum(hist))[0])
     bright_arr = np.array(bright_arr)
 

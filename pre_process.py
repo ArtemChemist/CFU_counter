@@ -49,7 +49,7 @@ def main():
                 # Becasue Hough needs to be stable, but this procidure needs to be precise
                 BestCirc = Find_Best_Center(circles = Circles,
                                                 image= img_scaled,
-                                                start= 480,
+                                                start= 500,
                                                 end = 720,
                                                 step = 10)
 
