@@ -1,4 +1,4 @@
-iter,thresholded?,threshold,precision,recall
+iteration,thresholded?,threshold,precision,recall
 0,1,0,0.0794351279788173,1
 0,1,2.2984148E-27,0.0795755968169761,1
 0,1,6.1902167E-25,0.079646017699115,1
