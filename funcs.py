@@ -250,10 +250,10 @@ def save_model_results(model, model_dir, X_val_names, thr, y_true, y_pred, thres
   result_dir - 
   exp_name - string name of the experiment name
   '''
-  p = os.path.abspath('.')
-  #Save model
-  print("Saving model...")
-  model.save(model_dir)
+  if model_dir !='NAN':
+    #Save model
+    print("Saving model...")
+    model.save(model_dir)
 
   #Set up dir for saving resulting data
   print("Saving precision-recall data...")
@@ -273,23 +273,23 @@ def save_model_results(model, model_dir, X_val_names, thr, y_true, y_pred, thres
       csvwriter.writerow({"threshold":thr,
                           "precision":pr,
                           "recall":rec})
-      
-  print("Saving training history...")
-  # Save history into a csv
-  filename = os.path.join(result_dir, f'{exp_name}_history.csv')
-  if os.path.exists(filename):
-      append_write = 'a+' # append if already exists
-  else:
-      append_write = 'w+' # make a new file if not
-  with open(filename, append_write) as file_hist:
-    csvwriter = csv.DictWriter(file_hist, delimiter='\t', fieldnames=["epoch", "train_loss", "train_acc", "val_loss", "val_acc"])
-    csvwriter.writeheader()
-    for i in range(len(history.history['val_loss'])):
-      csvwriter.writerow({"epoch":i+1,
-                          "train_loss":history.history['loss'][i],
-                          "train_acc":history.history['accuracy'][i],
-                          "val_loss":history.history['val_loss'][i],
-                          "val_acc":history.history['val_accuracy'][i]})
+  if history != 'NAN':
+    print("Saving training history...")
+    # Save history into a csv
+    filename = os.path.join(result_dir, f'{exp_name}_history.csv')
+    if os.path.exists(filename):
+        append_write = 'a+' # append if already exists
+    else:
+        append_write = 'w+' # make a new file if not
+    with open(filename, append_write) as file_hist:
+      csvwriter = csv.DictWriter(file_hist, delimiter='\t', fieldnames=["epoch", "train_loss", "train_acc", "val_loss", "val_acc"])
+      csvwriter.writeheader()
+      for i in range(len(history.history['val_loss'])):
+        csvwriter.writerow({"epoch":i+1,
+                            "train_loss":history.history['loss'][i],
+                            "train_acc":history.history['accuracy'][i],
+                            "val_loss":history.history['val_loss'][i],
+                            "val_acc":history.history['val_accuracy'][i]})
   
   print("Saving names of mispredicted images...")
   # Save errors
@@ -313,9 +313,10 @@ def evaluate_model(history, y_true, y_pred, plot_target = False):
     f1 = f1_score(y_true, y_pred_dense, average='weighted')
     accuracy = accuracy_score(y_true, y_pred_dense)
     recall = recall_score(y_true, y_pred_dense)
-
-    # Convergence time
-    convergence = history.history['loss'][-1]
+    
+    if history!='NAN':
+      # Convergence time
+      convergence = history.history['loss'][-1]
 
     #Plot confusion matrics
     cm = confusion_matrix(y_true, y_pred_dense)
