@@ -3,7 +3,8 @@ import glob
 import numpy as np
 import os
 import cv2
-
+import csv
+import seaborn as sns
 
 def read_names(input_dir):
     '''
@@ -237,6 +238,107 @@ def prec_rec_at_threshold(labels, pred, thresholds):
     precisions.append(TP/(TP+FP))
     recalls.append(TP/P)
   return precisions, recalls
+
+def save_model_results(model, model_dir, X_val_names, thr, y_true, y_pred, thresholds, history, result_dir, exp_name):
+  '''
+  Saves model, prec-rec and history
+  Takes:
+  model, model_dir
+  y_true - an array of true labels
+  y_pred - an array of predicted probabilities
+  thresholds - an array of thresholds at wich to evaluate the probabilities
+  result_dir - 
+  exp_name - string name of the experiment name
+  '''
+  p = os.path.abspath('.')
+  #Save model
+  print("Saving model...")
+  model.save(model_dir)
+
+  #Set up dir for saving resulting data
+  print("Saving precision-recall data...")
+
+  # Save precision, recal, thresholds into a csv
+  precision, recall = prec_rec_at_threshold(y_true, y_pred[:,1], thresholds)
+
+  filename = os.path.join(result_dir, f'prec_rec_{exp_name}.csv')
+  if os.path.exists(filename):
+      append_write = 'a+' # append if already exists
+  else:
+      append_write = 'w+' # make a new file if not
+  with open(filename, append_write) as file_prrec:
+    csvwriter = csv.DictWriter(file_prrec, delimiter='\t', fieldnames=["threshold", "precision", "recall"])
+    csvwriter.writeheader()
+    for thr, pr, rec in zip(thresholds, precision, recall):
+      csvwriter.writerow({"threshold":thr,
+                          "precision":pr,
+                          "recall":rec})
+      
+  print("Saving training history...")
+  # Save history into a csv
+  filename = os.path.join(result_dir, f'{exp_name}_history.csv')
+  if os.path.exists(filename):
+      append_write = 'a+' # append if already exists
+  else:
+      append_write = 'w+' # make a new file if not
+  with open(filename, append_write) as file_hist:
+    csvwriter = csv.DictWriter(file_hist, delimiter='\t', fieldnames=["epoch", "train_loss", "train_acc", "val_loss", "val_acc"])
+    csvwriter.writeheader()
+    for i in range(len(history.history['val_loss'])):
+      csvwriter.writerow({"epoch":i+1,
+                          "train_loss":history.history['loss'][i],
+                          "train_acc":history.history['accuracy'][i],
+                          "val_loss":history.history['val_loss'][i],
+                          "val_acc":history.history['val_accuracy'][i]})
+  
+  print("Saving names of mispredicted images...")
+  # Save errors
+  y_pred_thr = [int(i > thr) for i in y_pred[:,1] ]
+  errors = [i for i in range(len(y_true)) if (y_true[i]!=y_pred_thr[i]) ]
+  file_path = os.path.join(result_dir, f'{exp_name}_errors.csv')
+  with open(file_path, 'w+') as file_err:
+    csvwriter = csv.DictWriter(file_err, delimiter='\t', fieldnames=["name", "true", "pred"])
+    csvwriter.writeheader()
+    for idx in errors:
+      csvwriter.writerow({"name":X_val_names[idx], "true": y_true[idx] , "pred":y_pred_thr[idx]})
+
+
+
+from sklearn.metrics import f1_score, accuracy_score, recall_score
+from sklearn.metrics import confusion_matrix, PrecisionRecallDisplay
+
+def evaluate_model(history, y_true, y_pred, plot_target = False):
+
+    y_pred_dense = np.argmax(y_pred, axis=1)
+    f1 = f1_score(y_true, y_pred_dense, average='weighted')
+    accuracy = accuracy_score(y_true, y_pred_dense)
+    recall = recall_score(y_true, y_pred_dense)
+
+    # Convergence time
+    convergence = history.history['loss'][-1]
+
+    #Plot confusion matrics
+    cm = confusion_matrix(y_true, y_pred_dense)
+    group_names = ['True Neg','False Pos','False Neg','True Pos']
+    group_counts = [f'{value}' for value in cm.flatten()]
+    group_percentages = [f'{value:.2f}' for value in cm.flatten()/np.sum(cm)]
+    labels = [f'{v1}\n{v2}\n{v3}' for v1, v2, v3 in
+              zip(group_names,group_counts,group_percentages)]
+    labels = np.asarray(labels).reshape(2,2)
+    sns.heatmap(cm, annot=labels, fmt='', cmap='Reds')
+
+    #Plot precision and recall
+    display = PrecisionRecallDisplay.from_predictions(y_true, y_pred[:,1], name="CNN Model")
+    _ = display.ax_.set_title("Precision-Recall curve")
+    _ = display.ax_.set_xlim(0,1)
+    _ = display.ax_.set_ylim(0,1)
+    _ = display.ax_.spines['top'].set_visible(False)
+    _ = display.ax_.spines['right'].set_visible(False)
+    if plot_target:
+      _ = display.ax_.fill_between([0.99,1], [0.3,0.3], [1,1], facecolor = 'green', alpha=.5)
+
+    return f1, accuracy, recall, convergence
+
 
 from keras.callbacks import EarlyStopping
 class CustomStopper(EarlyStopping):
