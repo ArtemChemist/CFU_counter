@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 9
+names: ['artifact', 'bubble', 'colony', 'gate', 'lock', 'sharpie', 'star', 'tape', 'unlock']
+
+roboflow:
+  workspace: cfu-vqd76
+  project: colonies-on-petri-shishes
+  version: 3
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/cfu-vqd76/colonies-on-petri-shishes/dataset/3

@@ -1,0 +1,6 @@
+path: 'content/gdrive/My Drive'
+train: ../images/train
+val: ../images/val
+
+nc: 9
+names: ['artifact', 'bubble', 'colony', 'gate', 'lock', 'sharpie', 'star', 'tape', 'unlock']

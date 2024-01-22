@@ -2,3 +2,4 @@ Smpl_Im/*.jpg
 Thresholded/*.jpg
 **/*.jpg
 *.zip
+**/labels/*.txt
